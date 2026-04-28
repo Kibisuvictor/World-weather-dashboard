@@ -1,4 +1,4 @@
-# 🌦️ African Weather Analytics Dashboard
+# 🌦️ World Weather Analytics Dashboard
 
 An end-to-end automated data pipeline that pulls weather data from Kaggle,
 engineers features, trains an ML model tracked with MLflow, and serves an
