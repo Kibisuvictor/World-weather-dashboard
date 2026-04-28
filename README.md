@@ -52,8 +52,8 @@ data/curated/weather.duckdb
 ### 1. Clone & configure
 
 ```bash
-git clone https://github.com/<your-username>/african-weather-dashboard.git
-cd african-weather-dashboard
+git clone https://github.com/<your-username>/World-weather-dashboard.git
+cd World-weather-dashboard
 cp .env.example .env
 # Edit .env with your Kaggle and shinyapps.io credentials
 ```
