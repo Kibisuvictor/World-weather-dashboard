@@ -1,0 +1,108 @@
+# .github/workflows/ingest.yml
+# ─────────────────────────────────────────────────────────────────────────────
+# Schedule:  daily at 06:00 UTC
+# Steps:
+#   1. Pull fresh data from Kaggle (Python + Docker)
+#   2. Build DuckDB (R: build_db.R)
+#   3. Train ML model and log to MLflow (R: train_model.R)
+#   4. Commit updated curated/ back to the repo
+# ─────────────────────────────────────────────────────────────────────────────
+
+name: Ingest → Transform → Train
+
+on:
+  schedule:
+    - cron: "0 6 * * *"   # daily 06:00 UTC
+  workflow_dispatch:       # manual trigger from GitHub UI
+
+jobs:
+  pipeline:
+    runs-on: ubuntu-latest
+    env:      
+      R_LIBS_USER: ${{ github.workspace }}/.Rlibs
+    timeout-minutes: 60
+
+    steps:
+      # ── 1. Checkout ──────────────────────────────────────────────────────
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0   # needed for git push later
+
+      # ── 2. Create data directories ───────────────────────────────────────
+      - name: Create data directories
+        run: mkdir -p data/raw data/staging data/curated
+
+      # ── 3. Kaggle ingest (Dockerised Python) ────────────────────────────
+      - name: Build ingest image
+        run: docker build -t weather-ingest ./ingest
+
+      - name: Run ingest container
+        env:
+          KAGGLE_USERNAME: ${{ secrets.KAGGLE_USERNAME }}
+          KAGGLE_KEY:      ${{ secrets.KAGGLE_KEY }}
+        run: |
+          docker run --rm \
+            -e KAGGLE_USERNAME="${KAGGLE_USERNAME}" \
+            -e KAGGLE_KEY="${KAGGLE_KEY}" \
+            -v "${{ github.workspace }}/data:/project/data" \
+            weather-ingest
+
+      # ── 4. Set up R ──────────────────────────────────────────────────────
+      - name: Set up R
+        uses: r-lib/actions/setup-r@v2
+        with:
+          r-version: "4.4.0"
+          use-public-rspm: true
+
+      # ── 5. Cache R packages ──────────────────────────────────────────────
+      - name: Cache R packages
+        uses: actions/cache@v4
+        with:
+          path: ${{ env.R_LIBS_USER }}
+          key: r-pkgs-${{ hashFiles('transform/renv.lock') }}
+          restore-keys: r-pkgs-
+
+      # ── 6. Install R dependencies ────────────────────────────────────────
+      - name: Install R packages
+        run: |
+          Rscript -e "
+            pkgs <- c('tidyverse','lubridate','janitor','duckdb','DBI',
+                      'tidymodels','ranger','vip','mlflow')
+            missing <- pkgs[!pkgs %in% installed.packages()[,'Package']]
+            if (length(missing) > 0)
+              install.packages(missing, repos='https://cloud.r-project.org')
+          "
+
+      # ── 7. Build DuckDB ──────────────────────────────────────────────────
+      - name: Build DuckDB (feature engineering)
+        run: Rscript transform/build_db.R
+
+      # ── 8. Install MLflow Python backend ────────────────────────────────
+      - name: Install MLflow
+        run: |
+          pip install mlflow --quiet
+          Rscript -e "mlflow::install_mlflow()"
+
+      # ── 9. Train model ───────────────────────────────────────────────────
+      - name: Train ML model + log to MLflow
+        run: Rscript transform/train_model.R
+
+      # ── 10. Upload MLflow artefacts ──────────────────────────────────────
+      - name: Upload MLflow artefacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: mlflow-runs
+          path: mlflow_tracking/
+          retention-days: 30
+
+      # ── 11. Commit updated curated data back to repo ──────────────────────
+      - name: Commit curated outputs
+        run: |
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git config user.name  "github-actions[bot]"
+          git add data/curated/
+          # Only commit if something changed
+          git diff --staged --quiet || \
+            git commit -m "chore: refresh curated data [skip ci] $(date -u '+%Y-%m-%d %H:%M UTC')"
+          git push

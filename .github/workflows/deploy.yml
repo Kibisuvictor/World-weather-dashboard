@@ -1,0 +1,95 @@
+# .github/workflows/deploy.yml
+# ─────────────────────────────────────────────────────────────────────────────
+# Triggers:  push to main that changes shiny_app/ OR data/curated/
+# Steps:
+#   1. Deploy Shiny app to shinyapps.io (free tier) using rsconnect
+# ─────────────────────────────────────────────────────────────────────────────
+
+name: Deploy to shinyapps.io
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "shiny_app/**"
+      - "data/curated/**"
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    env:
+      R_LIBS_USER: ${{ github.workspace }}/.Rlibs
+    timeout-minutes: 30
+
+    steps:
+      # ── 1. Checkout ──────────────────────────────────────────────────────
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      # ── 2. Set up R ──────────────────────────────────────────────────────
+      - name: Set up R
+        uses: r-lib/actions/setup-r@v2
+        with:
+          r-version: "4.4.0"
+          use-public-rspm: true
+
+      # ── 3. Cache R packages ──────────────────────────────────────────────
+      - name: Cache R packages
+        uses: actions/cache@v4
+        with:
+          path: ${{ env.R_LIBS_USER }}
+          key: r-deploy-${{ hashFiles('shiny_app/renv.lock') }}
+          restore-keys: r-deploy-
+
+      # ── 4. Install R dependencies ────────────────────────────────────────
+      - name: Install R packages
+        run: |
+          Rscript -e "
+            pkgs <- c('shiny','shinydashboard','shinycssloaders',
+                      'tidyverse','lubridate','plotly','DT','duckdb','DBI',
+                      'Rtsne','uwot','igraph','gganimate','ggrepel',
+                      'viridis','gifski','rsconnect','tidymodels','vip')
+            missing <- pkgs[!pkgs %in% installed.packages()[,'Package']]
+            if (length(missing) > 0)
+              install.packages(missing, repos='https://cloud.r-project.org')
+          "
+
+      # ── 5. Stage deploy folder ───────────────────────────────────────────
+      # shinyapps.io needs the app and data in the same directory or
+      # you embed the DuckDB relative to app.R
+      - name: Stage app for deploy
+        run: |
+          mkdir -p deploy/data/curated
+          cp shiny_app/app.R          deploy/app.R
+          cp data/curated/weather.duckdb  deploy/data/curated/weather.duckdb
+          # Include ML artefacts if present
+          [ -f data/curated/weather_model.rds ] && \
+            cp data/curated/weather_model.rds  deploy/data/curated/ || true
+          [ -f data/curated/model_metrics.rds ] && \
+            cp data/curated/model_metrics.rds  deploy/data/curated/ || true
+          # Patch DB_PATH to relative path for shinyapps.io
+          sed -i 's|../data/curated/weather.duckdb|data/curated/weather.duckdb|g' deploy/app.R
+          sed -i 's|../data/curated/weather_model.rds|data/curated/weather_model.rds|g' deploy/app.R
+          sed -i 's|../data/curated/model_metrics.rds|data/curated/model_metrics.rds|g' deploy/app.R
+
+      # ── 6. Deploy to shinyapps.io ─────────────────────────────────────────
+      - name: Deploy to shinyapps.io
+        env:
+          SHINYAPPS_ACCOUNT: ${{ secrets.SHINYAPPS_ACCOUNT }}
+          SHINYAPPS_TOKEN:   ${{ secrets.SHINYAPPS_TOKEN }}
+          SHINYAPPS_SECRET:  ${{ secrets.SHINYAPPS_SECRET }}
+        run: |
+          Rscript -e "
+            rsconnect::setAccountInfo(
+              name   = Sys.getenv('SHINYAPPS_ACCOUNT'),
+              token  = Sys.getenv('SHINYAPPS_TOKEN'),
+              secret = Sys.getenv('SHINYAPPS_SECRET')
+            )
+            rsconnect::deployApp(
+              appDir      = 'deploy',
+              appName     = 'african-weather-dashboard',
+              forceUpdate = TRUE,
+              launch.browser = FALSE
+            )
+          "

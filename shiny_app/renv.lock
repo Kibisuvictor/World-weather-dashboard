@@ -1,0 +1,33 @@
+{
+  "R": {
+    "Version": "4.4.0",
+    "Repositories": [
+      {
+        "Name": "CRAN",
+        "URL": "https://cloud.r-project.org"
+      }
+    ]
+  },
+  "Packages": {
+    "shiny":             { "Package": "shiny",             "Version": "1.8.1",  "Source": "Repository" },
+    "shinydashboard":    { "Package": "shinydashboard",    "Version": "0.7.2",  "Source": "Repository" },
+    "shinycssloaders":   { "Package": "shinycssloaders",   "Version": "1.0.0",  "Source": "Repository" },
+    "tidyverse":         { "Package": "tidyverse",         "Version": "2.0.0",  "Source": "Repository" },
+    "lubridate":         { "Package": "lubridate",         "Version": "1.9.3",  "Source": "Repository" },
+    "plotly":            { "Package": "plotly",            "Version": "4.10.4", "Source": "Repository" },
+    "DT":                { "Package": "DT",                "Version": "0.33",   "Source": "Repository" },
+    "duckdb":            { "Package": "duckdb",            "Version": "0.10.1", "Source": "Repository" },
+    "DBI":               { "Package": "DBI",               "Version": "1.2.3",  "Source": "Repository" },
+    "Rtsne":             { "Package": "Rtsne",             "Version": "0.17",   "Source": "Repository" },
+    "uwot":              { "Package": "uwot",              "Version": "0.2.2",  "Source": "Repository" },
+    "igraph":            { "Package": "igraph",            "Version": "2.0.3",  "Source": "Repository" },
+    "gganimate":         { "Package": "gganimate",         "Version": "1.0.9",  "Source": "Repository" },
+    "ggrepel":           { "Package": "ggrepel",           "Version": "0.9.5",  "Source": "Repository" },
+    "viridis":           { "Package": "viridis",           "Version": "0.6.5",  "Source": "Repository" },
+    "gifski":            { "Package": "gifski",            "Version": "1.12.0", "Source": "Repository" },
+    "tidymodels":        { "Package": "tidymodels",        "Version": "1.2.0",  "Source": "Repository" },
+    "ranger":            { "Package": "ranger",            "Version": "0.16.0", "Source": "Repository" },
+    "vip":               { "Package": "vip",               "Version": "0.4.1",  "Source": "Repository" },
+    "rsconnect":         { "Package": "rsconnect",         "Version": "1.3.1",  "Source": "Repository" }
+  }
+}

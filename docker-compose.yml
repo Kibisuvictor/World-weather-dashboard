@@ -1,0 +1,78 @@
+# docker-compose.yml
+# ─────────────────────────────────────────────────────────────────────────────
+# Local development stack — runs everything with one command:
+#   docker compose up
+#
+# Services:
+#   ingest   → pulls Kaggle data into data/raw/
+#   transform → builds DuckDB + trains model (R)
+#   shiny    → serves the dashboard on http://localhost:3838
+#   mlflow   → experiment tracking UI on http://localhost:5000
+# ─────────────────────────────────────────────────────────────────────────────
+
+version: "3.9"
+
+services:
+
+  # ── 1. Kaggle ingest ───────────────────────────────────────────────────────
+  ingest:
+    build:
+      context: ./ingest
+      dockerfile: Dockerfile
+    container_name: weather_ingest
+    volumes:
+      - ./data:/project/data
+    environment:
+      - KAGGLE_USERNAME=${KAGGLE_USERNAME}
+      - KAGGLE_KEY=${KAGGLE_KEY}
+    restart: "no"   # run once
+
+  # ── 2. R transform (DuckDB build + model training) ─────────────────────────
+  transform:
+    build:
+      context: ./transform
+      dockerfile: Dockerfile
+    container_name: weather_transform
+    volumes:
+      - ./data:/project/data
+      - ./mlflow_tracking:/project/mlflow_tracking
+    depends_on:
+      - ingest
+    restart: "no"
+
+  # ── 3. Shiny dashboard ─────────────────────────────────────────────────────
+  shiny:
+    build:
+      context: ./shiny_app
+      dockerfile: Dockerfile
+    container_name: weather_shiny
+    ports:
+      - "3838:3838"
+    volumes:
+      # Mount curated data so the app always reads the latest DuckDB
+      - ./data/curated:/srv/shiny-server/weatherapp/data/curated:ro
+      - ./shiny_app/www:/srv/shiny-server/weatherapp/www
+    depends_on:
+      - transform
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3838"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # ── 4. MLflow UI (free, local) ─────────────────────────────────────────────
+  mlflow:
+    image: ghcr.io/mlflow/mlflow:v2.12.2   # free official image
+    container_name: weather_mlflow
+    ports:
+      - "5000:5000"
+    volumes:
+      - ./mlflow_tracking:/mlflow
+    command: >
+      mlflow server
+        --backend-store-uri /mlflow
+        --default-artifact-root /mlflow/artifacts
+        --host 0.0.0.0
+        --port 5000
+    restart: unless-stopped
