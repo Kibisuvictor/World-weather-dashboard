@@ -1,9 +1,48 @@
 # 🌦️ African Weather Analytics Dashboard
 
+## 🛠️ Tools & Technologies
+
+### Data Engineering
+![Python](https://img.shields.io/badge/Python-3.11-3776AB?logo=python&logoColor=white)
+![R](https://img.shields.io/badge/R-4.4.0-276DC3?logo=r&logoColor=white)
+![DuckDB](https://img.shields.io/badge/DuckDB-0.10-FFF000?logo=duckdb&logoColor=black)
+![Kaggle](https://img.shields.io/badge/Kaggle_API-Data_Source-20BEFF?logo=kaggle&logoColor=white)
+
+### Machine Learning
+![tidymodels](https://img.shields.io/badge/tidymodels-Random_Forest-FF6F00)
+![MLflow](https://img.shields.io/badge/MLflow-2.3.2-0194E2?logo=mlflow&logoColor=white)
+
+### Orchestration & DevOps
+![Docker](https://img.shields.io/badge/Docker-Containerised-2496ED?logo=docker&logoColor=white)
+![GitHub Actions](https://img.shields.io/badge/GitHub_Actions-CI%2FCD-2088FF?logo=githubactions&logoColor=white)
+
+### Visualisation
+![Shiny](https://img.shields.io/badge/Shiny-Dashboard-276DC3?logo=r&logoColor=white)
+![Plotly](https://img.shields.io/badge/Plotly-Interactive_Charts-3F4F75?logo=plotly&logoColor=white)
+![shinyapps.io](https://img.shields.io/badge/shinyapps.io-Deployed-4C8BF5)
+
 An end-to-end automated data pipeline that pulls weather data from Kaggle,
 engineers features, trains an ML model tracked with MLflow, and serves an
 interactive Shiny dashboard — all orchestrated with Docker and GitHub Actions.
 
+
+## Why This Project
+
+This project demonstrates a production-style data pipeline applied to 
+African weather data — an area underrepresented in open data science portfolios.
+
+Key engineering decisions:
+- **DuckDB over PostgreSQL** — serverless, zero-infra, file-based OLAP 
+  database that runs inside Docker with no separate service needed
+- **tidymodels over caret** — modern, consistent ML framework with 
+  built-in cross-validation and hyperparameter tuning
+- **MLflow for experiment tracking** — full parameter/metric/artefact 
+  logging across runs, viewable via local UI at http://localhost:5000
+- **GitHub Actions for orchestration** — daily cron pipeline that pulls 
+  fresh data, rebuilds the database, retrains the model, and redeploys 
+  the dashboard automatically with zero manual intervention
+- **shinyapps.io for serving** — free tier deployment with automatic 
+  redeployment triggered by data or code changes
 ---
 
 ## Architecture
