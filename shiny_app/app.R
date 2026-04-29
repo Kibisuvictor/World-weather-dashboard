@@ -26,7 +26,7 @@ suppressPackageStartupMessages({
 
 # --- 1. DuckDB Connection & Data Load ----------------------------------------
 # Connect to the pre-built DuckDB database (created by transform/build_db.R)
-DB_PATH <- "../data/curated/weather.duckdb"
+DB_PATH <- "data/curated/weather.duckdb"
 
 load_weather_data <- function(db_path) {
   if (!file.exists(db_path)) {
@@ -845,8 +845,8 @@ server <- function(input, output, session) {
 
   # ── J. ML Insights ─────────────────────────────────────────────────────────
   ml_results <- reactive({
-    model_path  <- "../data/curated/weather_model.rds"
-    metrics_path <- "../data/curated/model_metrics.rds"
+    model_path  <- "data/curated/weather_model.rds"
+    metrics_path <- "data/curated/model_metrics.rds"
 
     if (!file.exists(model_path)) {
       return(NULL)

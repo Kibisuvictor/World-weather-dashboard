@@ -48,6 +48,7 @@ services:
     ports:
       - "3838:3838"
     volumes:
+      - ./shiny_app/app.R:/srv/shiny-server/weatherapp/app.R
       # Mount curated data (DuckDB + model RDS) into the app directory
       - ./data/curated:/srv/shiny-server/weatherapp/data/curated
       # Mount www so generated GIFs are writable at runtime
