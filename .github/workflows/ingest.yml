@@ -18,8 +18,6 @@ on:
 jobs:
   pipeline:
     runs-on: ubuntu-latest
-    env:      
-      R_LIBS_USER: ${{ github.workspace }}/.Rlibs
     timeout-minutes: 60
 
     steps:

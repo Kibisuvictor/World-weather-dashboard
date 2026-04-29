@@ -10,8 +10,6 @@
 #   mlflow   → experiment tracking UI on http://localhost:5000
 # ─────────────────────────────────────────────────────────────────────────────
 
-version: "3.9"
-
 services:
 
   # ── 1. Kaggle ingest ───────────────────────────────────────────────────────
@@ -21,11 +19,11 @@ services:
       dockerfile: Dockerfile
     container_name: weather_ingest
     volumes:
-      - ./data:/project/data
+      - ./data:/project/data          # writes to data/raw/
     environment:
       - KAGGLE_USERNAME=${KAGGLE_USERNAME}
       - KAGGLE_KEY=${KAGGLE_KEY}
-    restart: "no"   # run once
+    restart: "no"
 
   # ── 2. R transform (DuckDB build + model training) ─────────────────────────
   transform:
@@ -37,7 +35,8 @@ services:
       - ./data:/project/data
       - ./mlflow_tracking:/project/mlflow_tracking
     depends_on:
-      - ingest
+      ingest:
+        condition: service_completed_successfully
     restart: "no"
 
   # ── 3. Shiny dashboard ─────────────────────────────────────────────────────
@@ -49,21 +48,24 @@ services:
     ports:
       - "3838:3838"
     volumes:
-      # Mount curated data so the app always reads the latest DuckDB
-      - ./data/curated:/srv/shiny-server/weatherapp/data/curated:ro
+      # Mount curated data (DuckDB + model RDS) into the app directory
+      - ./data/curated:/srv/shiny-server/weatherapp/data/curated
+      # Mount www so generated GIFs are writable at runtime
       - ./shiny_app/www:/srv/shiny-server/weatherapp/www
     depends_on:
-      - transform
+      transform:
+        condition: service_completed_successfully
     restart: unless-stopped
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:3838"]
       interval: 30s
       timeout: 10s
-      retries: 3
+      retries: 5
+      start_period: 20s
 
   # ── 4. MLflow UI (free, local) ─────────────────────────────────────────────
   mlflow:
-    image: ghcr.io/mlflow/mlflow:v2.12.2   # free official image
+    image: ghcr.io/mlflow/mlflow:v2.3.2
     container_name: weather_mlflow
     ports:
       - "5000:5000"

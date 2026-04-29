@@ -1,4 +1,4 @@
-# 🌦️ World Weather Analytics Dashboard
+# 🌦️ African Weather Analytics Dashboard
 
 An end-to-end automated data pipeline that pulls weather data from Kaggle,
 engineers features, trains an ML model tracked with MLflow, and serves an
@@ -52,8 +52,8 @@ data/curated/weather.duckdb
 ### 1. Clone & configure
 
 ```bash
-git clone https://github.com/<your-username>/World-weather-dashboard.git
-cd World-weather-dashboard
+git clone https://github.com/<your-username>/african-weather-dashboard.git
+cd african-weather-dashboard
 cp .env.example .env
 # Edit .env with your Kaggle and shinyapps.io credentials
 ```

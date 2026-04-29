@@ -1,0 +1,15 @@
+artifact_uri: /project/mlflow_tracking/628429014609670779/a5b34377525e434b9994f934c36aa1bb/artifacts
+end_time: null
+entry_point_name: ''
+experiment_id: '628429014609670779'
+lifecycle_stage: active
+run_id: a5b34377525e434b9994f934c36aa1bb
+run_name: amazing-doe-440
+run_uuid: a5b34377525e434b9994f934c36aa1bb
+source_name: ''
+source_type: 4
+source_version: ''
+start_time: 1777460021650
+status: 1
+tags: []
+user_id: root

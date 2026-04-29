@@ -1,0 +1,15 @@
+artifact_uri: /project/mlflow_tracking/628429014609670779/44a090cd2fc74152b97d333ae5c5b139/artifacts
+end_time: null
+entry_point_name: ''
+experiment_id: '628429014609670779'
+lifecycle_stage: active
+run_id: 44a090cd2fc74152b97d333ae5c5b139
+run_name: marvelous-dove-531
+run_uuid: 44a090cd2fc74152b97d333ae5c5b139
+source_name: ''
+source_type: 4
+source_version: ''
+start_time: 1777458339384
+status: 1
+tags: []
+user_id: root

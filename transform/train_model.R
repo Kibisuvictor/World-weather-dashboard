@@ -107,53 +107,75 @@ metrics <- collect_metrics(final_fit)
 cat("  Test-set metrics:\n")
 print(metrics)
 
+# Always save model and metrics to disk first — independent of MLflow
+saveRDS(final_model, MODEL_OUT)
+saveRDS(metrics,     METRICS_OUT)
+cat(sprintf("  Model saved  → %s\n", MODEL_OUT))
+cat(sprintf("  Metrics saved→ %s\n", METRICS_OUT))
+
 # --- 7. MLflow logging -------------------------------------------------------
 cat("Logging to MLflow...\n")
-mlflow_set_tracking_uri(paste0("file://", normalizePath(MLFLOW_DIR)))
-mlflow_set_experiment("weather_temperature_forecast")
 
-with(mlflow_start_run(), {
-  # Log parameters
-  mlflow_log_param("model_type",  "random_forest")
-  mlflow_log_param("trees",       300)
-  mlflow_log_param("mtry",        best_params$mtry)
-  mlflow_log_param("min_n",       best_params$min_n)
-  mlflow_log_param("train_rows",  nrow(train_d))
-  mlflow_log_param("test_rows",   nrow(test_d))
-  mlflow_log_param("cv_folds",    5)
+# Ensure R mlflow package can locate the Python/mlflow binaries.
+# The Dockerfile sets these via ENV, but we also set them here as a safety net.
+venv_python <- "/opt/mlflow-env/bin/python3"
+venv_mlflow <- "/opt/mlflow-env/bin/mlflow"
 
-  # Log metrics
-  rmse_val <- metrics |> filter(.metric == "rmse") |> pull(.estimate)
-  rsq_val  <- metrics |> filter(.metric == "rsq")  |> pull(.estimate)
-  mae_val  <- metrics |> filter(.metric == "mae")   |> pull(.estimate)
+if (file.exists(venv_python) && nchar(Sys.getenv("MLFLOW_PYTHON_BIN")) == 0) {
+  Sys.setenv(MLFLOW_PYTHON_BIN = venv_python)
+}
+if (file.exists(venv_mlflow) && nchar(Sys.getenv("MLFLOW_BIN")) == 0) {
+  Sys.setenv(MLFLOW_BIN = venv_mlflow)
+}
 
-  mlflow_log_metric("rmse", rmse_val)
-  mlflow_log_metric("rsq",  rsq_val)
-  mlflow_log_metric("mae",  mae_val)
+rmse_val <- metrics |> filter(.metric == "rmse") |> pull(.estimate)
+rsq_val  <- metrics |> filter(.metric == "rsq")  |> pull(.estimate)
+mae_val  <- metrics |> filter(.metric == "mae")   |> pull(.estimate)
 
-  # Log model artifact
-  saveRDS(final_model, MODEL_OUT)
-  mlflow_log_artifact(MODEL_OUT)
+mlflow_ok <- tryCatch({
+  mlflow_set_tracking_uri(paste0("file://", normalizePath(MLFLOW_DIR)))
+  mlflow_set_experiment("weather_temperature_forecast")
 
-  # Log feature importance plot
-  imp_plot_path <- file.path(MLFLOW_DIR, "feature_importance.png")
-  png(imp_plot_path, width = 800, height = 500)
-  print(
-    final_model |>
-      extract_fit_parsnip() |>
-      vip(num_features = 15) +
-      labs(title = "Feature Importance — Random Forest") +
-      theme_minimal()
-  )
-  dev.off()
-  mlflow_log_artifact(imp_plot_path)
+  with(mlflow_start_run(), {
+    mlflow_log_param("model_type", "random_forest")
+    mlflow_log_param("trees",      300)
+    mlflow_log_param("mtry",       best_params$mtry)
+    mlflow_log_param("min_n",      best_params$min_n)
+    mlflow_log_param("train_rows", nrow(train_d))
+    mlflow_log_param("test_rows",  nrow(test_d))
+    mlflow_log_param("cv_folds",   5)
 
-  cat(sprintf("  MLflow run logged: RMSE=%.3f  R²=%.3f  MAE=%.3f\n",
-              rmse_val, rsq_val, mae_val))
+    mlflow_log_metric("rmse", rmse_val)
+    mlflow_log_metric("rsq",  rsq_val)
+    mlflow_log_metric("mae",  mae_val)
+
+    # Log model artifact (already saved to disk above)
+    mlflow_log_artifact(MODEL_OUT)
+
+    # Feature importance plot
+    imp_plot_path <- file.path(MLFLOW_DIR, "feature_importance.png")
+    png(imp_plot_path, width = 800, height = 500)
+    print(
+      final_model |>
+        extract_fit_parsnip() |>
+        vip(num_features = 15) +
+        labs(title = "Feature Importance — Random Forest") +
+        theme_minimal()
+    )
+    dev.off()
+    mlflow_log_artifact(imp_plot_path)
+  })
+  TRUE
+}, error = function(e) {
+  cat(sprintf("  WARNING: MLflow logging failed — %s\n", e$message))
+  cat("  Model and metrics are still saved to disk.\n")
+  FALSE
 })
 
-# --- 8. Save metrics for Shiny -----------------------------------------------
-saveRDS(metrics, METRICS_OUT)
+if (mlflow_ok) {
+  cat(sprintf("  MLflow run logged: RMSE=%.3f  R²=%.3f  MAE=%.3f\n",
+              rmse_val, rsq_val, mae_val))
+}
 
 cat("=== train_model.R : Done ===\n")
 cat(sprintf("  Model  → %s\n", MODEL_OUT))

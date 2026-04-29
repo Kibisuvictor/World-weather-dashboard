@@ -66,7 +66,7 @@ date_range <- if (nrow(weather_df) > 0) {
     max_date  = max(as.Date(weather_df$last_updated), na.rm = TRUE)
   )
 } else {
-  list(min_year = 2023, max_year = 2025,
+  list(min_year = 2024, max_year = 2025,
        min_date = Sys.Date() - 365, max_date = Sys.Date())
 }
 

@@ -1,28 +1,40 @@
 # transform/Dockerfile
-FROM rocker/r-ver:4.4.0
+# rocker/tidyverse already includes R, tidyverse, devtools + all system libs
+FROM rocker/tidyverse:4.4.0
 
-# System libraries
+# Extra system libraries needed by the additional R packages
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    libcurl4-openssl-dev \
-    libssl-dev \
-    libxml2-dev \
     python3-pip \
+    python3-venv \
+    python3-full \
+    libxml2-dev \
+    libgit2-dev \
     && rm -rf /var/lib/apt/lists/*
 
-# Install MLflow Python backend (required by R mlflow package)
-RUN pip3 install mlflow --quiet
+# Install MLflow into a venv so the binary path is predictable
+RUN python3 -m venv /opt/mlflow-env && \
+    /opt/mlflow-env/bin/pip install --quiet "mlflow==2.3.2"
 
-# Install R packages
-RUN R -e "install.packages(
-  c('tidyverse','lubridate','janitor','duckdb','DBI',
-    'tidymodels','ranger','vip','mlflow'),
-  repos = 'https://cloud.r-project.org'
-)"
+# Tell the R mlflow package exactly where to find the binaries
+ENV MLFLOW_PYTHON_BIN=/opt/mlflow-env/bin/python3
+ENV MLFLOW_BIN=/opt/mlflow-env/bin/mlflow
+
+# Verify the binary exists at build time — fails the build early if not
+RUN /opt/mlflow-env/bin/mlflow --version
+
+# Install remaining R packages
+# tidyverse & lubridate are already in the base image — skip them
+RUN R -e " \
+  pkgs <- c('janitor','duckdb','DBI', \
+            'tidymodels','ranger','vip','mlflow'); \
+  install.packages(pkgs, repos='https://cloud.r-project.org', \
+                   Ncpus=2, quiet=TRUE) \
+"
 
 WORKDIR /project
 
 COPY build_db.R    .
 COPY train_model.R .
 
-# Run both scripts sequentially
+# Run both scripts sequentially; exit non-zero if either fails
 CMD Rscript build_db.R && Rscript train_model.R
