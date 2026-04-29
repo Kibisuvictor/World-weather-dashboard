@@ -1,4 +1,4 @@
-# 🌦️ African Weather Analytics Dashboard
+# 🌦️ Weather Analytics Dashboard
 
 ## 🛠️ Tools & Technologies
 
@@ -29,7 +29,7 @@ interactive Shiny dashboard — all orchestrated with Docker and GitHub Actions.
 ## Why This Project
 
 This project demonstrates a production-style data pipeline applied to 
-African weather data — an area underrepresented in open data science portfolios.
+weather data — an area underrepresented in open data science portfolios.
 
 Key engineering decisions:
 - **DuckDB over PostgreSQL** — serverless, zero-infra, file-based OLAP 
