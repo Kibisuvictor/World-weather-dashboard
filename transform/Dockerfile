@@ -25,7 +25,7 @@ RUN /opt/mlflow-env/bin/mlflow --version
 # Install remaining R packages
 # tidyverse & lubridate are already in the base image — skip them
 RUN R -e " \
-  pkgs <- c('janitor','duckdb','DBI', \
+  pkgs <- c('janitor', 'tidyverse','duckdb','DBI', \
             'tidymodels','ranger','vip','mlflow'); \
   install.packages(pkgs, repos='https://cloud.r-project.org', \
                    Ncpus=2, quiet=TRUE) \
