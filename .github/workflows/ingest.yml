@@ -17,7 +17,7 @@ on:
 jobs:
   pipeline:
     runs-on: ubuntu-latest
-    timeout-minutes: 15 # Drastically reduced from 60
+    timeout-minutes: 45
 
     steps:
       # ── 1. Checkout ──────────────────────────────────────────────────────
