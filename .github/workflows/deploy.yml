@@ -18,7 +18,7 @@ on:
 jobs:
   deploy:
     runs-on: ubuntu-latest
-    timeout-minutes: 15 # Reduced from 30
+    timeout-minutes: 45 # Reduced from 30
 
     steps:
       # ── 1. Checkout ──────────────────────────────────────────────────────
@@ -57,7 +57,7 @@ jobs:
           "
 
       # ── 5. Stage deploy folder ───────────────────────────────────────────
-      - name: Stage app for deploy
+       - name: Stage app for deploy
         run: |
           mkdir -p deploy/data/curated
           cp shiny_app/app.R              deploy/app.R
@@ -72,6 +72,9 @@ jobs:
           sed -i 's|../data/curated/weather_model.rds|data/curated/weather_model.rds|g' deploy/app.R
           sed -i 's|../data/curated/model_metrics.rds|data/curated/model_metrics.rds|g' deploy/app.R
 
+          # CRITICAL NEW STEP: Force shinyapps.io remote server to pull Linux binaries
+          echo "options(repos = c(CRAN = 'https://packagemanager.posit.co/cran/__linux__/noble/latest'))" > deploy/.Rprofile
+
       # ── 6. Deploy to shinyapps.io ─────────────────────────────────────────
       - name: Deploy to shinyapps.io
         env:
@@ -80,8 +83,6 @@ jobs:
           SHINYAPPS_SECRET:  ${{ secrets.SHINYAPPS_SECRET }}
         run: |
           Rscript -e "
-            # Crucial: Tell rsconnect to record the binary package repository 
-            # so shinyapps.io doesn't struggle to resolve dependencies
             options(repos = c(CRAN = 'https://packagemanager.posit.co/cran/__linux__/noble/latest'))
 
             rsconnect::setAccountInfo(
