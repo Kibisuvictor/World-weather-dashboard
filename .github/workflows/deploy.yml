@@ -94,5 +94,5 @@ jobs:
               appName        = 'african-weather-dashboard',
               forceUpdate    = TRUE,
               launch.browser = FALSE
-              )
-              "
+            )
+          "
