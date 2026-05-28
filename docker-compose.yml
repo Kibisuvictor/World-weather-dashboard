@@ -1,13 +1,7 @@
 # docker-compose.yml
 # ─────────────────────────────────────────────────────────────────────────────
 # Local development stack — runs everything with one command:
-#   docker compose up
-#
-# Services:
-#   ingest   → pulls Kaggle data into data/raw/
-#   transform → builds DuckDB + trains model (R)
-#   shiny    → serves the dashboard on http://localhost:3838
-#   mlflow   → experiment tracking UI on http://localhost:5000
+#    docker compose up
 # ─────────────────────────────────────────────────────────────────────────────
 
 services:
@@ -28,12 +22,13 @@ services:
   # ── 2. R transform (DuckDB build + model training) ─────────────────────────
   transform:
     build:
-      context: ./transform
-      dockerfile: Dockerfile
+      context: .
+      file: transform/Dockerfile
     container_name: weather_transform
     volumes:
-      - ./data:/project/data
-      - ./mlflow_tracking:/project/mlflow_tracking
+      # Mount the whole project root so relative paths (../data) work identically 
+      # inside both the docker container and your local machine setup
+      - .:/project
     depends_on:
       ingest:
         condition: service_completed_successfully
@@ -49,13 +44,12 @@ services:
       - "3838:3838"
     volumes:
       - ./shiny_app/app.R:/srv/shiny-server/weatherapp/app.R
-      # Mount curated data (DuckDB + model RDS) into the app directory
       - ./data/curated:/srv/shiny-server/weatherapp/data/curated
-      # Mount www so generated GIFs are writable at runtime
       - ./shiny_app/www:/srv/shiny-server/weatherapp/www
+    # CHANGED: Allow app to start anytime if the DB already exists locally
     depends_on:
       transform:
-        condition: service_completed_successfully
+        condition: service_started
     restart: unless-stopped
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:3838"]
@@ -64,18 +58,20 @@ services:
       retries: 5
       start_period: 20s
 
-  # ── 4. MLflow UI (free, local) ─────────────────────────────────────────────
+  # ── 4. MLflow UI (Fixed path syncing) ──────────────────────────────────────
   mlflow:
     image: ghcr.io/mlflow/mlflow:v2.3.2
     container_name: weather_mlflow
     ports:
       - "5000:5000"
     volumes:
-      - ./mlflow_tracking:/mlflow
+      # Sync the volume path perfectly with where your R container writes it
+      - ./mlflow_tracking:/project/mlflow_tracking
     command: >
       mlflow server
-        --backend-store-uri /mlflow
-        --default-artifact-root /mlflow/artifacts
+        --backend-store-uri /project/mlflow_tracking
+        --default-artifact-root /project/mlflow_tracking/artifacts
         --host 0.0.0.0
         --port 5000
+    restart: unless-stopped
     restart: unless-stopped
