@@ -33,8 +33,8 @@ RUN R -e " \
 
 WORKDIR /project
 
-COPY build_db.R    .
-COPY train_model.R .
+COPY transform/build_db.R    .
+COPY transform/train_model.R .
 
 # Run both scripts sequentially; exit non-zero if either fails
 CMD Rscript build_db.R && Rscript train_model.R
