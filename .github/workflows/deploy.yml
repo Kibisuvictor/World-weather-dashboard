@@ -18,19 +18,19 @@ on:
 jobs:
   deploy:
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 15 # Reduced from 30
 
     steps:
       # ── 1. Checkout ──────────────────────────────────────────────────────
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      # ── 2. Set up R ──────────────────────────────────────────────────────
+      # ── 2. Set up R with Posit Package Manager (Fast Linux Binaries) ──────
       - name: Set up R
         uses: r-lib/actions/setup-r@v2
         with:
           r-version: "4.4.0"
-          use-public-rspm: true
+          use-public-rspm: true # Enables binary installs
 
       # ── 3. Cache R packages ──────────────────────────────────────────────
       - name: Cache R packages
@@ -40,32 +40,33 @@ jobs:
           key: r-deploy-${{ hashFiles('shiny_app/renv.lock') }}
           restore-keys: r-deploy-
 
-      # ── 4. Install R dependencies ────────────────────────────────────────
+      # ── 4. Install R dependencies (FIXED REPOS OVERRIDE) ──────────────────
       - name: Install R packages
         run: |
           Rscript -e "
+            # Pull down the RSPM binary link to pass down to options
+            options(repos = c(CRAN = 'https://packagemanager.posit.co/cran/__linux__/noble/latest'))
+            
             pkgs <- c('shiny','shinydashboard','shinycssloaders',
                       'tidyverse','lubridate','plotly','DT','duckdb','DBI',
                       'Rtsne','uwot','igraph','gganimate','ggrepel',
                       'viridis','gifski','rsconnect','tidymodels','vip')
+                      
             missing <- pkgs[!pkgs %in% installed.packages()[,'Package']]
-            if (length(missing) > 0)
-              install.packages(missing, repos='https://cloud.r-project.org')
+            if (length(missing) > 0) install.packages(missing)
           "
 
       # ── 5. Stage deploy folder ───────────────────────────────────────────
-      # shinyapps.io needs the app and data in the same directory or
-      # you embed the DuckDB relative to app.R
       - name: Stage app for deploy
         run: |
           mkdir -p deploy/data/curated
-          cp shiny_app/app.R          deploy/app.R
+          cp shiny_app/app.R              deploy/app.R
           cp data/curated/weather.duckdb  deploy/data/curated/weather.duckdb
+          
           # Include ML artefacts if present
-          [ -f data/curated/weather_model.rds ] && \
-            cp data/curated/weather_model.rds  deploy/data/curated/ || true
-          [ -f data/curated/model_metrics.rds ] && \
-            cp data/curated/model_metrics.rds  deploy/data/curated/ || true
+          [ -f data/curated/weather_model.rds ] && cp data/curated/weather_model.rds  deploy/data/curated/ || true
+          [ -f data/curated/model_metrics.rds ] && cp data/curated/model_metrics.rds  deploy/data/curated/ || true
+          
           # Patch DB_PATH to relative path for shinyapps.io
           sed -i 's|../data/curated/weather.duckdb|data/curated/weather.duckdb|g' deploy/app.R
           sed -i 's|../data/curated/weather_model.rds|data/curated/weather_model.rds|g' deploy/app.R
@@ -79,15 +80,19 @@ jobs:
           SHINYAPPS_SECRET:  ${{ secrets.SHINYAPPS_SECRET }}
         run: |
           Rscript -e "
+            # Crucial: Tell rsconnect to record the binary package repository 
+            # so shinyapps.io doesn't struggle to resolve dependencies
+            options(repos = c(CRAN = 'https://packagemanager.posit.co/cran/__linux__/noble/latest'))
+
             rsconnect::setAccountInfo(
               name   = Sys.getenv('SHINYAPPS_ACCOUNT'),
               token  = Sys.getenv('SHINYAPPS_TOKEN'),
               secret = Sys.getenv('SHINYAPPS_SECRET')
             )
             rsconnect::deployApp(
-              appDir      = 'deploy',
-              appName     = 'african-weather-dashboard',
-              forceUpdate = TRUE,
+              appDir         = 'deploy',
+              appName        = 'african-weather-dashboard',
+              forceUpdate    = TRUE,
               launch.browser = FALSE
             )
           "
