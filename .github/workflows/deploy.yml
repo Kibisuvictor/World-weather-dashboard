@@ -18,7 +18,7 @@ on:
 jobs:
   deploy:
     runs-on: ubuntu-latest
-    timeout-minutes: 45 # Reduced from 30
+    timeout-minutes: 45 # Increased to give shinyapps.io server time to build packages
 
     steps:
       # ── 1. Checkout ──────────────────────────────────────────────────────
@@ -30,7 +30,7 @@ jobs:
         uses: r-lib/actions/setup-r@v2
         with:
           r-version: "4.4.0"
-          use-public-rspm: true # Enables binary installs
+          use-public-rspm: true # Enables fast binary installations on the runner
 
       # ── 3. Cache R packages ──────────────────────────────────────────────
       - name: Cache R packages
@@ -40,11 +40,10 @@ jobs:
           key: r-deploy-${{ hashFiles('shiny_app/renv.lock') }}
           restore-keys: r-deploy-
 
-      # ── 4. Install R dependencies (FIXED REPOS OVERRIDE) ──────────────────
+      # ── 4. Install R dependencies (Using Linux Binaries) ──────────────────
       - name: Install R packages
         run: |
           Rscript -e "
-            # Pull down the RSPM binary link to pass down to options
             options(repos = c(CRAN = 'https://packagemanager.posit.co/cran/__linux__/noble/latest'))
             
             pkgs <- c('shiny','shinydashboard','shinycssloaders',
@@ -57,7 +56,7 @@ jobs:
           "
 
       # ── 5. Stage deploy folder ───────────────────────────────────────────
-       - name: Stage app for deploy
+      - name: Stage app for deploy
         run: |
           mkdir -p deploy/data/curated
           cp shiny_app/app.R              deploy/app.R
@@ -72,7 +71,7 @@ jobs:
           sed -i 's|../data/curated/weather_model.rds|data/curated/weather_model.rds|g' deploy/app.R
           sed -i 's|../data/curated/model_metrics.rds|data/curated/model_metrics.rds|g' deploy/app.R
 
-          # CRITICAL NEW STEP: Force shinyapps.io remote server to pull Linux binaries
+          # Tell shinyapps.io remote server to pull Linux binaries instead of compiling from source
           echo "options(repos = c(CRAN = 'https://packagemanager.posit.co/cran/__linux__/noble/latest'))" > deploy/.Rprofile
 
       # ── 6. Deploy to shinyapps.io ─────────────────────────────────────────
@@ -95,5 +94,3 @@ jobs:
               appName        = 'african-weather-dashboard',
               forceUpdate    = TRUE,
               launch.browser = FALSE
-            )
-          "
