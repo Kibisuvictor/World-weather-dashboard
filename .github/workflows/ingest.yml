@@ -3,9 +3,8 @@
 # Schedule:  daily at 06:00 UTC
 # Steps:
 #   1. Pull fresh data from Kaggle (Python + Docker)
-#   2. Build DuckDB (R: build_db.R)
-#   3. Train ML model and log to MLflow (R: train_model.R)
-#   4. Commit updated curated/ back to the repo
+#   2. Build DuckDB & Train ML model sequentially inside a single Docker container
+#   3. Commit updated curated/ back to the repo
 # ─────────────────────────────────────────────────────────────────────────────
 
 name: Ingest → Transform → Train
@@ -18,7 +17,7 @@ on:
 jobs:
   pipeline:
     runs-on: ubuntu-latest
-    timeout-minutes: 60
+    timeout-minutes: 15 # Drastically reduced from 60
 
     steps:
       # ── 1. Checkout ──────────────────────────────────────────────────────
@@ -29,11 +28,21 @@ jobs:
 
       # ── 2. Create data directories ───────────────────────────────────────
       - name: Create data directories
-        run: mkdir -p data/raw data/staging data/curated
+        run: mkdir -p data/raw data/staging data/curated mlflow_tracking
 
-      # ── 3. Kaggle ingest (Dockerised Python) ────────────────────────────
+      # ── 3. Set up Docker Buildx for ultra-fast layer caching ─────────────
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      # ── 4. Kaggle ingest (Dockerised Python) ────────────────────────────
       - name: Build ingest image
-        run: docker build -t weather-ingest ./ingest
+        uses: docker/build-push-action@v5
+        with:
+          context: ./ingest
+          tags: weather-ingest:latest
+          load: true
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
 
       - name: Run ingest container
         env:
@@ -44,49 +53,29 @@ jobs:
             -e KAGGLE_USERNAME="${KAGGLE_USERNAME}" \
             -e KAGGLE_KEY="${KAGGLE_KEY}" \
             -v "${{ github.workspace }}/data:/project/data" \
-            weather-ingest
+            weather-ingest:latest
 
-      # ── 4. Set up R ──────────────────────────────────────────────────────
-      - name: Set up R
-        uses: r-lib/actions/setup-r@v2
+      # ── 5. Build and Cache Transform/Train Docker Image ──────────────────
+      - name: Build transform & train image
+        uses: docker/build-push-action@v5
         with:
-          r-version: "4.4.0"
-          use-public-rspm: true
+          context: .
+          file: transform/Dockerfile
+          tags: weather-transform:latest
+          load: true
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
 
-      # ── 5. Cache R packages ──────────────────────────────────────────────
-      - name: Cache R packages
-        uses: actions/cache@v4
-        with:
-          path: ${{ env.R_LIBS_USER }}
-          key: r-pkgs-${{ hashFiles('transform/renv.lock') }}
-          restore-keys: r-pkgs-
-
-      # ── 6. Install R dependencies ────────────────────────────────────────
-      - name: Install R packages
+      # ── 6. Run Transform & Train Inside Docker ────────────────────────────
+      # We mount both the data directory and the mlflow directory to persist outputs
+      - name: Run Transform & Train pipeline
         run: |
-          Rscript -e "
-            pkgs <- c('tidyverse','lubridate','janitor','duckdb','DBI',
-                      'tidymodels','ranger','vip','mlflow')
-            missing <- pkgs[!pkgs %in% installed.packages()[,'Package']]
-            if (length(missing) > 0)
-              install.packages(missing, repos='https://cloud.r-project.org')
-          "
+          docker run --rm \
+            -v "${{ github.workspace }}/data:/project/data" \
+            -v "${{ github.workspace }}/mlflow_tracking:/project/mlflow_tracking" \
+            weather-transform:latest
 
-      # ── 7. Build DuckDB ──────────────────────────────────────────────────
-      - name: Build DuckDB (feature engineering)
-        run: Rscript transform/build_db.R
-
-      # ── 8. Install MLflow Python backend ────────────────────────────────
-      - name: Install MLflow
-        run: |
-          pip install mlflow --quiet
-          Rscript -e "mlflow::install_mlflow()"
-
-      # ── 9. Train model ───────────────────────────────────────────────────
-      - name: Train ML model + log to MLflow
-        run: Rscript transform/train_model.R
-
-      # ── 10. Upload MLflow artefacts ──────────────────────────────────────
+      # ── 7. Upload MLflow artefacts ──────────────────────────────────────
       - name: Upload MLflow artefacts
         uses: actions/upload-artifact@v4
         with:
@@ -94,7 +83,7 @@ jobs:
           path: mlflow_tracking/
           retention-days: 30
 
-      # ── 11. Commit updated curated data back to repo ──────────────────────
+      # ── 8. Commit updated curated data back to repo ──────────────────────
       - name: Commit curated outputs
         run: |
           git config user.email "github-actions[bot]@users.noreply.github.com"
